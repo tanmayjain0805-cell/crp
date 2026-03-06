@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  PLAYER
+  UMPIRE
+  REFEREE
+  SCORER
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CORRECTION_REQUESTED
+}
+
+enum TournamentFormat {
+  T20
+  ONE_DAY
+  MULTI_DAY
+}
+
+enum TournamentStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  POSTPONED
+}
+
+enum BattingStyle {
+  RIGHT_HAND
+  LEFT_HAND
+}
+
+enum BowlingStyle {
+  RIGHT_ARM_FAST
+  RIGHT_ARM_MEDIUM
+  RIGHT_ARM_SPIN_OFF
+  RIGHT_ARM_SPIN_LEG
+  LEFT_ARM_FAST
+  LEFT_ARM_MEDIUM
+  LEFT_ARM_SPIN
+}
+
+enum PlayingRole {
+  BATSMAN
+  BOWLER
+  ALL_ROUNDER
+  WICKET_KEEPER
+  WICKET_KEEPER_BATSMAN
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum FixtureType {
+  ROUND_ROBIN
+  KNOCKOUT
+  BOTH
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  mobile    String   @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  player        Player?
+  umpire        Umpire?
+  referee       Referee?
+  scorer        Scorer?
+  notifications Notification[]
+  resetTokens   PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Player {
+  id            String             @id @default(cuid())
+  userId        String             @unique
+  user          User               @relation(fields: [userId], references: [id])
+  dob           DateTime
+  district      String
+  address       String
+  aadhaarUrl    String?
+  photoUrl      String?
+  previousClub  String?
+  playingRole   PlayingRole
+  battingStyle  BattingStyle
+  bowlingStyle  BowlingStyle?
+  status        RegistrationStatus @default(PENDING)
+  adminNote     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  teamPlayers   TeamPlayer[]
+  battingStats  BattingInning[]
+  bowlingStats  BowlingInning[]
+  fieldingStats FieldingEntry[]
+  careerStats   PlayerCareerStats?
+}
+
+model PlayerCareerStats {
+  id           String  @id @default(cuid())
+  playerId     String  @unique
+  player       Player  @relation(fields: [playerId], references: [id])
+  matches      Int     @default(0)
+  innings      Int     @default(0)
+  runs         Int     @default(0)
+  highScore    Int     @default(0)
+  average      Float   @default(0)
+  strikeRate   Float   @default(0)
+  fifties      Int     @default(0)
+  hundreds     Int     @default(0)
+  notOuts      Int     @default(0)
+  wickets      Int     @default(0)
+  ballsBowled  Int     @default(0)
+  runsConceded Int     @default(0)
+  bowlAvg      Float   @default(0)
+  economy      Float   @default(0)
+  fiveWickets  Int     @default(0)
+  catches      Int     @default(0)
+  runOuts      Int     @default(0)
+  stumpings    Int     @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+model Umpire {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  certificationLevel String
+  district          String
+  experience        Int      @default(0)
+  matchesOfficiated Int      @default(0)
+  isAvailable       Boolean  @default(true)
+  ratePerMatch      Float    @default(2000)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  assignments   MatchOfficialAssignment[]
+  payments      Payment[]
+  unavailability OfficialUnavailability[]
+}
+
+model Referee {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  certificationLevel String
+  district          String
+  experience        Int      @default(0)
+  matchesOfficiated Int      @default(0)
+  isAvailable       Boolean  @default(true)
+  ratePerMatch      Float    @default(2500)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  assignments    MatchOfficialAssignment[]
+  payments       Payment[]
+  unavailability OfficialUnavailability[]
+}
+
+model OfficialUnavailability {
+  id        String   @id @default(cuid())
+  umpireId  String?
+  refereeId String?
+  umpire    Umpire?  @relation(fields: [umpireId], references: [id])
+  referee   Referee? @relation(fields: [refereeId], references: [id])
+  fromDate  DateTime
+  toDate    DateTime
+  reason    String?
+}
+
+model Scorer {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  matches   Match[]
+  createdAt DateTime @default(now())
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  name         String
+  shortName    String
+  district     String
+  logoUrl      String?
+  createdAt    DateTime @default(now())
+
+  teamPlayers     TeamPlayer[]
+  homeMatches     Match[]          @relation("HomeTeam")
+  awayMatches     Match[]          @relation("AwayTeam")
+  winnerMatches   Match[]          @relation("WinnerTeam")
+  tournamentTeams TournamentTeam[]
+}
+
+model TeamPlayer {
+  id        String  @id @default(cuid())
+  teamId    String
+  playerId  String
+  isCaptain Boolean @default(false)
+  team      Team    @relation(fields: [teamId], references: [id])
+  player    Player  @relation(fields: [playerId], references: [id])
+
+  @@unique([teamId, playerId])
+}
+
+model Tournament {
+  id          String           @id @default(cuid())
+  name        String
+  format      TournamentFormat
+  fixtureType FixtureType
+  startDate   DateTime
+  endDate     DateTime
+  status      TournamentStatus @default(UPCOMING)
+  createdAt   DateTime         @default(now())
+
+  venues  Venue[]
+  teams   TournamentTeam[]
+  matches Match[]
+}
+
+model TournamentTeam {
+  id           String     @id @default(cuid())
+  tournamentId String
+  teamId       String
+  groupName    String?
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  team         Team       @relation(fields: [teamId], references: [id])
+
+  @@unique([tournamentId, teamId])
+}
+
+model Venue {
+  id           String      @id @default(cuid())
+  name         String
+  city         String
+  district     String
+  capacity     Int?
+  tournamentId String?
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id])
+  matches      Match[]
+}
+
+model Match {
+  id           String      @id @default(cuid())
+  tournamentId String
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id])
+  homeTeamId   String
+  awayTeamId   String
+  homeTeam     Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  venueId      String
+  venue        Venue       @relation(fields: [venueId], references: [id])
+  scheduledAt  DateTime
+  status       MatchStatus @default(SCHEDULED)
+  round        String?
+  matchNumber  Int?
+  result       String?
+  winnerId     String?
+  winner       Team?       @relation("WinnerTeam", fields: [winnerId], references: [id])
+  scorerId     String?
+  scorer       Scorer?     @relation(fields: [scorerId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  officials MatchOfficialAssignment[]
+  scorecard Scorecard?
+}
+
+model MatchOfficialAssignment {
+  id        String           @id @default(cuid())
+  matchId   String
+  match     Match            @relation(fields: [matchId], references: [id])
+  umpireId  String?
+  refereeId String?
+  umpire    Umpire?          @relation(fields: [umpireId], references: [id])
+  referee   Referee?         @relation(fields: [refereeId], references: [id])
+  role      String
+  status    AssignmentStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+}
+
+model Scorecard {
+  id          String   @id @default(cuid())
+  matchId     String   @unique
+  match       Match    @relation(fields: [matchId], references: [id])
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  innings Inning[]
+}
+
+model Inning {
+  id          String    @id @default(cuid())
+  scorecardId String
+  scorecard   Scorecard @relation(fields: [scorecardId], references: [id])
+  teamId      String
+  inningNo    Int
+  totalRuns   Int       @default(0)
+  totalWkts   Int       @default(0)
+  totalOvers  Float     @default(0)
+  extras      Int       @default(0)
+
+  battingEntries  BattingInning[]
+  bowlingEntries  BowlingInning[]
+  fieldingEntries FieldingEntry[]
+  fallOfWickets   FallOfWicket[]
+}
+
+model BattingInning {
+  id        String  @id @default(cuid())
+  inningId  String
+  inning    Inning  @relation(fields: [inningId], references: [id])
+  playerId  String
+  player    Player  @relation(fields: [playerId], references: [id])
+  runs      Int     @default(0)
+  balls     Int     @default(0)
+  fours     Int     @default(0)
+  sixes     Int     @default(0)
+  isOut     Boolean @default(false)
+  dismissal String?
+  strikeRate Float  @default(0)
+}
+
+model BowlingInning {
+  id       String @id @default(cuid())
+  inningId String
+  inning   Inning @relation(fields: [inningId], references: [id])
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+  overs    Float  @default(0)
+  maidens  Int    @default(0)
+  runs     Int    @default(0)
+  wickets  Int    @default(0)
+  wides    Int    @default(0)
+  noBalls  Int    @default(0)
+  economy  Float  @default(0)
+}
+
+model FieldingEntry {
+  id        String @id @default(cuid())
+  inningId  String
+  inning    Inning @relation(fields: [inningId], references: [id])
+  playerId  String
+  player    Player @relation(fields: [playerId], references: [id])
+  catches   Int    @default(0)
+  runOuts   Int    @default(0)
+  stumpings Int    @default(0)
+}
+
+model FallOfWicket {
+  id       String @id @default(cuid())
+  inningId String
+  inning   Inning @relation(fields: [inningId], references: [id])
+  wicketNo Int
+  runs     Int
+  overs    Float
+  playerId String
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  umpireId     String?
+  refereeId    String?
+  umpire       Umpire?       @relation(fields: [umpireId], references: [id])
+  referee      Referee?      @relation(fields: [refereeId], references: [id])
+  month        Int
+  year         Int
+  matches      Int
+  ratePerMatch Float
+  totalAmount  Float
+  status       PaymentStatus @default(PENDING)
+  paidAt       DateTime?
+  adminNote    String?
+  createdAt    DateTime      @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  sentVia   String   @default("APP")
+  createdAt DateTime @default(now())
+}
