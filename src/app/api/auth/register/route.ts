@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { signToken } from '@/lib/jwt'
+
+const bcrypt = require('bcryptjs')
+const jwt    = require('jsonwebtoken')
+
+const SECRET: string = process.env.JWT_SECRET || 'crp_default_secret'
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,42 +28,32 @@ export async function POST(req: NextRequest) {
     }
 
     const hashed = await bcrypt.hash(password, 12)
-
-    const user = await prisma.user.create({
+    const user   = await prisma.user.create({
       data: { name, email, mobile, password: hashed, role },
     })
 
     if (role === 'UMPIRE') {
       await prisma.umpire.create({
-        data: {
-          userId:            user.id,
-          certificationLevel: 'Level 1',
-          district:          '',
-        },
+        data: { userId: user.id, certificationLevel: 'Level 1', district: '' },
       })
     } else if (role === 'REFEREE') {
       await prisma.referee.create({
-        data: {
-          userId:            user.id,
-          certificationLevel: 'Level 1',
-          district:          '',
-        },
+        data: { userId: user.id, certificationLevel: 'Level 1', district: '' },
       })
     } else if (role === 'SCORER') {
       await prisma.scorer.create({ data: { userId: user.id } })
     }
 
-    const token = signToken({
-      userId: user.id,
-      email:  user.email,
-      role:   user.role,
-      name:   user.name,
-    })
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role, name: user.name },
+      SECRET,
+      { expiresIn: '7d' }
+    )
 
     const res = NextResponse.json(
       {
         message: 'Registration successful',
-        user:    { id: user.id, name: user.name, email: user.email, role: user.role },
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
       },
       { status: 201 }
     )
