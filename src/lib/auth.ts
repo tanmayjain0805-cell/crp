@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken, JWTPayload } from './jwt'
+
+const jwt = require('jsonwebtoken')
+
+const SECRET: string = process.env.JWT_SECRET || 'crp_default_secret'
+
+export interface JWTPayload {
+  userId: string
+  email:  string
+  role:   string
+  name:   string
+}
 
 export function getTokenFromRequest(req: NextRequest): string | null {
   const authHeader = req.headers.get('authorization')
@@ -8,6 +18,10 @@ export function getTokenFromRequest(req: NextRequest): string | null {
   }
   const cookie = req.cookies.get('crp_token')
   return cookie?.value ?? null
+}
+
+export function verifyToken(token: string): JWTPayload {
+  return jwt.verify(token, SECRET) as JWTPayload
 }
 
 export function requireAuth(
